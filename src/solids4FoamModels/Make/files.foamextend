@@ -259,4 +259,4 @@ meshes/meshDance/pointGeneration.C
 meshes/meshDance/meshWire.C
 meshes/meshDance/meshDance.C
 
-LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels
+LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels
