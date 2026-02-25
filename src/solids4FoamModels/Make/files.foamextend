@@ -254,9 +254,11 @@ numerics/meshDualiser/meshDualiser.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 
-/* DALE mesh */
-meshes/meshDance/pointGeneration.C
+/* DALE mesh and solidModel */
+meshes/meshDance/pointGenerator.C
 meshes/meshDance/meshWire.C
 meshes/meshDance/meshDance.C
 
-LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels
+solidModels/DALE/DALE.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels
