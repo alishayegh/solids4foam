@@ -60,19 +60,35 @@ registerFields_(regFields),
 //pseudoTime_(),
 dMeshPtr_
 (
-    dynamicFvMesh::New
-    (
-        IOobject
+	(
+        dynamicFvMesh::New
         (
-            dynamicFvMesh::defaultRegion,
-            runTime.timeName(),
-            runTime,
-            IOobject::MUST_READ
+            IOobject
+            (
+                dynamicFvMesh::defaultRegion,
+                runTime.timeName(),
+                runTime,
+                IOobject::MUST_READ
+            )
         )
-    )
+	).ptr()
 ),
+//dMeshAPtr_
+//(
+//    dynamicFvMesh::New
+//    (
+//        IOobject
+//        (
+//            dynamicFvMesh::defaultRegion,
+//            runTime.timeName(),
+//            runTime,
+//            IOobject::MUST_READ
+//        )
+//    )
+//),
 /// mesh_ remained from the previous design; ideally we need dMeshPtr_ only.
-mesh_(dMeshPtr_()),
+//mesh_(dMeshPtr_()),
+mesh_(*dMeshPtr_),
 fields_(mesh_, runTime.timeName()),
 /// ALEDict
 ALEDict_
@@ -83,7 +99,8 @@ ALEDict_
         (
             word("ALEDict"),
             runTime.constant(),
-            dMeshPtr_(),
+            //dMeshPtr_(),
+            *dMeshPtr_,
             IOobject::MUST_READ
         )
     )
@@ -149,8 +166,8 @@ boundBoxMax_()
 
     read<bool>        (aleDict, word("flipFluxSign"), flipFluxSign_);
 
-	read<bool>
-	    (aleDict, word("forceWriteAtRemapTime"), ifForceWriteAtRemapTime_);
+    read<bool>
+        (aleDict, word("forceWriteAtRemapTime"), ifForceWriteAtRemapTime_);
     /// How many timeSteps per one rezone
     read<label>        (aleDict, word("rezoneFrequency"), rezoneFreq_);
 
@@ -259,7 +276,7 @@ bool Foam::meshDance::stepTowards()
             << /*abort(FatalError)*/endl;
 
             hitFinalMesh();
-	    return true;
+        return true;
     }
     else
     {
@@ -276,7 +293,7 @@ bool Foam::meshDance::stepTowards()
                 << endl;
 
             hitFinalMesh();
-	    return true;
+        return true;
         }
         else
         {
@@ -292,7 +309,7 @@ bool Foam::meshDance::stepTowards()
             );
         }
 
-	return false;
+    return false;
     }
 }
 
@@ -336,6 +353,7 @@ void Foam::meshDance::updateMotionFraction()
 //    return sumMotionFraction_;
 //}
 
+
 /// Move the mesh back to its initial config, incrementally
 void Foam::meshDance::cyclicStep
 (/*const dimensionedScalar& startTime*/)
@@ -357,10 +375,12 @@ void Foam::meshDance::cyclicStep
     );
 }
 
+
 void Foam::meshDance::write()
 {
     mesh_.write();
 }
+
 
 void Foam::meshDance::writeMesh()
 {
@@ -427,15 +447,18 @@ void Foam::meshDance::writeMesh()
     //mesh_.points().write()
 }
 
+
 void Foam::meshDance::resetPoints()
 {
     mesh_.movePoints(startingPoints_);
 }
 
+
 void Foam::meshDance::resetStartingPoints(const pointField& pf)
 {
     const_cast<pointField&>(updatedStartingPoints_) = pf;
 }
+
 
 /// Re-set mesh motion settings when a cycle is finished.
 /// - startTime
@@ -463,6 +486,7 @@ void Foam::meshDance::resetMotion()
     resetSumMotionFraction();
 }
 
+
 Foam::scalar Foam::meshDance::fluxSign()
 {
     if (flipFluxSign_)
@@ -472,6 +496,7 @@ Foam::scalar Foam::meshDance::fluxSign()
 
     return 1.0;
 }
+
 
 bool Foam::meshDance::ifRezone(const label someCounter)
 {
@@ -492,6 +517,7 @@ bool Foam::meshDance::ifRezone(const label someCounter)
 
     return false;
 }
+
 
 bool Foam::meshDance::rezoneNow(const label count)
 {
@@ -522,19 +548,30 @@ bool Foam::meshDance::rezoneNow(const label count)
     return false;
 }
 
+
 bool Foam::meshDance::badMesh()
 {
     /// I check mesh quality.... later!
     return false;
 }
 
+
 /// Laplacian smoother
 Foam::pointField Foam::meshDance::smooth()
 {
     Info<< "    Lapalaian smoother starts.\n";
 
+    //if (dMeshPtr_.empty())
+    if (!dMeshPtr_)
+    {
+        FatalErrorIn("meshDance::smooth()")
+            << "dMeshPtr_ is empty!\n"
+            << abort(FatalError);
+    }
+
     /// Mesh reference
-    /*dynamicF*/fvMesh& mesh = dMeshPtr_();
+    ///*dynamicF*/fvMesh& mesh = dMeshPtr_();
+    /*dynamicF*/fvMesh& mesh = *dMeshPtr_;
 
     //Info << "3-D mesh" << endl;
 
@@ -820,20 +857,34 @@ Foam::pointField Foam::meshDance::smooth()
     Info<< "    Mesh smoothing done\n" << endl;
 }
 
+
 /// Obtains the rezoned state; mesh motion actually happens in
 /// remap()
 void Foam::meshDance::rezone(const pointField& targetPoints)
 {
-    this -> setOverallPointMotion(dMeshPtr_().points(), targetPoints);
+    //if (dMeshPtr_.empty())
+    if (!dMeshPtr_)
+    {
+        FatalErrorIn("meshDance::rezone()")
+            << "dMeshPtr_ is empty!\n"
+            << abort(FatalError);
+    }
+
+    //this -> setOverallPointMotion(dMeshPtr_().points(), targetPoints);
+    this -> setOverallPointMotion(dMeshPtr_ -> points(), targetPoints);
+
+    /// Debug info
+    //Info<< "    Rezone successful\n";
 }
+
 
 void Foam::meshDance::remap(const bool write)
 {
     const scalar now = runTime_.value();
     const label nowIndex = runTime_.timeIndex();
 
-	/// To be accessed inside advect()
-	nowName_ = runTime_.timeName();
+    /// To be accessed inside advect()
+    nowName_ = runTime_.timeName();
 
     for (label iter = 0; iter < nRemapSteps_; ++iter)
     {
@@ -871,8 +922,8 @@ void Foam::meshDance::remap(const bool write)
 
         /// Write -- for debugging
 
-		/// Previous design: Write remap steps in physical time dirs.
-		/// New design: Write remap steps "inside" the remap physical time
+        /// Previous design: Write remap steps in physical time dirs.
+        /// New design: Write remap steps "inside" the remap physical time
 
         /// Counting starts from 0, so iter + 1
         //if (writeRemappedSteps_ && ((iter+1) % remapWriteFreq_ < SMALL))
@@ -902,7 +953,7 @@ void Foam::meshDance::remap(const bool write)
     /// write parameter is responsible for forcing mesh and fields being
     /// written, ignoring the controlDict write controls
     //if (write)
-	if (ifForceWriteAtRemapTime_)
+    if (ifForceWriteAtRemapTime_)
     {
         this->write();
 
@@ -914,4 +965,42 @@ void Foam::meshDance::remap(const bool write)
     Info<<"    Remap done\n    Time reset to "
         << runTime_.timeName()
         <<"\n";
+}
+
+
+bool Foam::meshDance::permissibleToAdvect(const word& fieldName)
+{
+    std::smatch matches;
+    std::regex illegal{R"(ddt0+)"};
+
+    if
+    (
+        std::regex_search(fieldName, matches, illegal)
+    )
+    {
+        Info<< nl
+            << "    "
+            << fieldName
+            << " is hard-coded to not be advected"
+            << '\n';
+
+        return false;
+    }
+
+    /// Run-time selected names
+    forAll(illegalToAdvect_, fieldI)
+    {
+        if (fieldName == illegalToAdvect_[fieldI])
+        {
+            Info<< nl
+                << "    "
+                << fieldName
+                << " was selected to not be advected"
+                << '\n';
+
+            return false;
+        }
+    }
+
+    return true;
 }

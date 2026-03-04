@@ -24,6 +24,12 @@ Description
 Author
     Zeljko Tukovic, FSB Zagreb.  All rights reserved.
     Philip Cardiff, UCD. All rights reserved.
+    Maalik (Ali Shayegh, ali@tensorfields.com), TensorFields, UCD
+
+    Use the command below to see the author of (a) specific line(s):
+        git blame -L <start, end> <file>
+    e.g.,
+        git blame -L 100,100 form.C
 
 SourceFiles
     solidModel.C
@@ -52,6 +58,9 @@ SourceFiles
 #include "PackedBoolList.H"
 #include "dualMeshToMeshMap.H"
 
+/// ALE Functionality
+#include "meshDance.H"
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -67,6 +76,10 @@ class solidModel
     public regIOobject
 {
     // Private data
+
+        //- Mesh wrapper (for ALE)
+        //autoPtr<meshDance> deformingMeshPtr_;
+        meshDance* deformingMeshPtr_;
 
         //- Mesh
         autoPtr<dynamicFvMesh> meshPtr_;
@@ -393,7 +406,8 @@ public:
         (
             const word& type,
             Time& runTime,
-            const word& region = dynamicFvMesh::defaultRegion
+            const word& region = dynamicFvMesh::defaultRegion,
+            const bool isALE = false
         );
 
 
@@ -411,6 +425,20 @@ public:
     // Member Functions
 
         // Access
+
+            //- Return non-const mesh wrapper for ALE operations
+            meshDance& deformingMesh()
+            {
+                //return deformingMeshPtr_();
+                return *deformingMeshPtr_;
+            }
+
+            //- Return const mesh wrapper
+            const meshDance& deformingMesh() const
+            {
+                //return deformingMeshPtr_();
+                return *deformingMeshPtr_;
+            }
 
             //- Return mesh
             const dynamicFvMesh& mesh() const
@@ -686,6 +714,18 @@ public:
 
             //- Clear global poly patches
             void clearGlobalPatches() const;
+
+            //- Read and re-set old fields
+            template<class T>
+            GeometricField<T, fvPatchField, volMesh>& 
+            readOld
+            (
+                const word& newName,
+                const GeometricField<T, fvPatchField, volMesh>& referenceField,
+                const dimensionSet& dims
+            ) const;
+
+            autoPtr<dynamicFvMesh> makeMeshAutoPtr();
 
         // Edit
 

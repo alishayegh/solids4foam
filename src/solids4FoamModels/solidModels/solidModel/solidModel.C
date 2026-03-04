@@ -35,6 +35,12 @@ License
 #include "meshTools.H"
 #include "addToRunTimeSelectionTable.H"
 
+/// ALE Functionality
+#include "meshDance.H"
+#include "fvPatchField.H"
+#include "volMesh.H"
+//#include "autoPtr.H"
+
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
@@ -955,7 +961,8 @@ Foam::solidModel::solidModel
 (
     const word& type,
     Time& runTime,
-    const word& region
+    const word& region,
+    const bool isALE
 )
 :
     physicsModel(type, runTime),
@@ -972,9 +979,22 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
+    deformingMeshPtr_
+    (
+        isALE
+      ? new meshDance(runTime, false)
+      : 0
+    ),
     meshPtr_
     (
-        dynamicFvMesh::New
+        isALE
+      ? autoPtr<dynamicFvMesh>(deformingMeshPtr_->dMeshPtr()) //-- Compiler
+	  // internal error, when dMeshPtr() returns ptr instead of autoPtr
+      //? deformingMeshPtr_->dMeshPtr()
+	  //? makeMeshAutoPtr()
+      //? dynamicFvMesh::New(deformingMeshPtr_->dMesh()) -- Creates a copy
+      //? new dynamicFvMesh(deformingMeshPtr_->dMesh()) -- ERROR
+      : dynamicFvMesh::New
         (
             IOobject
             (
@@ -1266,6 +1286,68 @@ Foam::solidModel::solidModel
         gradD_.writeOpt() = IOobject::AUTO_WRITE;
         gradD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
         gradDD_.writeOpt() = IOobject::AUTO_WRITE;
+
+        // /// Easy access to old fields through aliases
+        // /// "o" for old
+        // /// "r" for reference
+        // Info<< "DDr\n";
+        // volVectorField& DDr = DD_;
+        // Info<< "DDor\n";
+        // volVectorField& DDor = DDr.oldTime();
+        // Info<< "grad DDor\n";
+        // fvc::grad(DDor);
+        // Info<< "DDoor\n";
+        // volVectorField& DDoor = DDor.oldTime();
+        // Info<< "DDooor\n";
+        // volVectorField& DDooor = DDoor.oldTime();
+
+        // Info<< "Dr\n";
+        // volVectorField& Dr = D_;
+        // Info<< "Dor\n";
+        // volVectorField& Dor = Dr.oldTime();
+        // Info<< "Door\n";
+        // volVectorField& Door = Dor.oldTime();
+        // Info<< "Dooor\n";
+        // volVectorField& Dooor = Door.oldTime();
+
+        // //volScalarField& rhor = rho();
+        // //volScalarField& rhoor = rhor.oldTime();
+        // //volScalarField& rhooor = rhoor.oldTime();
+        // //volScalarField& rhoooor = rhooor.oldTime();
+
+        // /// Re-set old fields, if they did not exist on the disk
+        // /// Re-fill old field pointers
+
+        // Info<< "read Dor\n";
+        // Dor = this->readOld<vector>(Dor.name(), D_, dimLength);
+        // Info<< "read Door\n";
+        // Door = this->readOld<vector>(Door.name(), D_, dimLength);
+        // Info<< "read Dooor\n";
+        // Dooor = this->readOld<vector>(Dooor.name(), D_, dimLength);
+        // //this->readOld<vector>(D0000, "D_0_0_0_0", D);
+
+
+        // //DD_.oldTime() = this->readOld<vector>(DDor.name(), DD_, dimLength);
+		// fvc::grad(DDoor, "grad(DD_0_0)");
+        // Info<< "read DDoor\n";
+        // DDoor = this->readOld<vector>(DDoor.name(), DD_, dimLength);
+        // Info<< "read DDooor\n";
+        // DDooor = this->readOld<vector>(DDooor.name(), DD_, dimLength);
+        // //Doooo = this->readOld<vector>(DD0000, "DD_0_0_0_0", DD);
+
+        // Info<< "read DDor\n";
+        // //volVectorField xxx
+        // //    (
+        // //        DDor.name(),
+        // //        this->readOld<vector>(DDor.name(),DD_, dimLength)
+        // //    );
+        // //DDor = xxx;
+		// DD_.oldTime() = DD_;
+
+        // //rhoor = this->readOld<scalar>(rhoor.name(), rho(), dimDensity);
+        // //rhooor = this->readOld<scalar>(rhooor.name(), rho(), dimDensity);
+        // //rhoooor = this->readOld<scalar>(rhoooor.name(), rho(), dimDensity);
+        // //rho = this->readOld<scalar>(rho0000, "rho_0_0_0_0", rho);
     }
     else
     {
@@ -1327,6 +1409,8 @@ Foam::solidModel::solidModel
     // PC, 12-Nov-18: disabling the 3rd direction slows down convergence a lot
     // in some elastic cases: disabled for now
     //checkWedges();
+    
+    Info<< "Constructor ends\n";
 }
 
 
@@ -1336,10 +1420,77 @@ Foam::solidModel::~solidModel()
 {
     thermalPtr_.clear();
     mechanicalPtr_.clear();
+	delete deformingMeshPtr_;
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+/// A separate member function to create the mesh autoPtr; this aims to avoid
+/// internal compiler error
+/// Unsuccessful
+Foam::autoPtr<Foam::dynamicFvMesh> Foam::solidModel::makeMeshAutoPtr()
+{
+    autoPtr<dynamicFvMesh> meshAPtr;
+    meshAPtr.set(deformingMeshPtr_->dMeshPtr());
+	return meshAPtr;
+}
+
+template<class T>
+Foam::GeometricField<T, Foam::fvPatchField, Foam::volMesh>& 
+Foam::solidModel::readOld
+(
+    const word& newName,
+    const GeometricField<T, fvPatchField, volMesh>& referenceField,
+    const dimensionSet& dims
+) const
+{
+    /// Try to read from the disk
+    GeometricField<T, fvPatchField, volMesh>* vfPtr = new
+        GeometricField<T, fvPatchField, volMesh>
+        (
+            IOobject
+            (
+                newName,
+                runTime().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensioned<T>("zero", dims, pTraits<T>::zero)
+        );
+
+    GeometricField<T, fvPatchField, volMesh>& vf = *vfPtr;
+
+    /// Did you read it from the disk?
+    if (vf.headerOk())
+    {
+        return vf;
+    }
+    else
+    {
+        IOobject fieldIO = referenceField;
+
+        if (fieldIO.headerOk())
+        {
+            vf = referenceField;
+            vf.rename(newName);
+        }
+        else
+        {
+            WarningIn("Constructor")
+                << "Could not find "
+                << referenceField.name()
+                << " at "
+                << runTime().timeName()
+                << "\nInitialized to zero.\n";
+        }
+
+        return vf;
+    }
+}
 
 const Foam::volScalarField& Foam::solidModel::rho() const
 {

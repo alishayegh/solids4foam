@@ -11,42 +11,6 @@
 /// To match field names for being/not being advected
 //#include <regex>
 
-bool Foam::meshDance::permissibleToAdvect(const word& fieldName)
-{
-    std::smatch matches;
-    std::regex illegal{R"(ddt0+)"};
-
-    if
-    (
-        std::regex_search(fieldName, matches, illegal)
-    )
-    {
-        Info<< nl
-            << "    "
-            << fieldName
-            << " is hard-coded to not be advected"
-            << '\n';
-
-        return false;
-    }
-
-    /// Run-time selected names
-    forAll(illegalToAdvect_, fieldI)
-    {
-        if (fieldName == illegalToAdvect_[fieldI])
-        {
-            Info<< nl
-                << "    "
-                << fieldName
-                << " was selected to not be advected"
-                << '\n';
-
-            return false;
-        }
-    }
-
-    return true;
-}
 
 template<class Type>
 void Foam::meshDance::registerFields()
@@ -299,7 +263,7 @@ void Foam::meshDance::registerFields()
 
             //    // Method 1:
             //    /*GeometricField<Type, fvPatchField, volMesh>**/ fieldPtr = new 
-	    //        GeometricField<Type, fvPatchField, volMesh>
+        //        GeometricField<Type, fvPatchField, volMesh>
             //        (
             //            IOobject
             //            (
@@ -433,15 +397,15 @@ void Foam::meshDance::advect(bool writeAdvectedFields)
     )
     {
         GeometricField
-	<
-	    Type, fvPatchField, volMesh
-	>& field = const_cast
-	<
+    <
+        Type, fvPatchField, volMesh
+    >& field = const_cast
+    <
         GeometricField
-	<
-	    Type, fvPatchField, volMesh
-	>&
-	>(*fieldIter());
+    <
+        Type, fvPatchField, volMesh
+    >&
+    >(*fieldIter());
 
         if 
         (
@@ -450,15 +414,15 @@ void Foam::meshDance::advect(bool writeAdvectedFields)
         {
             /// Create the copy of the field to be convected
 
-	    GeometricField<Type, fvPatchField, volMesh> tfield
+        GeometricField<Type, fvPatchField, volMesh> tfield
             (
                 IOobject
                 (
                     field.name()+"_tmp",
                     //mesh_.time().timeName(),
-					nowName_,
-					//"remapSteps/"+mesh_.time().timeName(),
-					fileName("remapSteps/"+runTime_.timeName()),
+                    nowName_,
+                    //"remapSteps/"+mesh_.time().timeName(),
+                    fileName("remapSteps/"+runTime_.timeName()),
                     //pseudoTime_.timeName(),
                     mesh_,
                     IOobject::NO_READ,
@@ -473,8 +437,8 @@ void Foam::meshDance::advect(bool writeAdvectedFields)
                 << " created"
                 << endl;
 
-	    for (label iter=0; iter < maxIter_; iter++)
-	    {
+        for (label iter=0; iter < maxIter_; iter++)
+        {
                 fvMatrix<Type> fieldEq
                 (
                     fluxSign() * fvm::div(fluxSign() * mesh_.phi(), tfield)
@@ -485,7 +449,7 @@ void Foam::meshDance::advect(bool writeAdvectedFields)
                 Info<<"    "
                     << fieldEq.solve()
                     << endl;
-	    }
+        }
 
             Info<< "    " 
                 << "Field " 
@@ -632,15 +596,15 @@ void Foam::meshDance::advects(bool writeAdvectedFields)
     )
     {
         GeometricField
-	<
-	    Type, fvsPatchField, surfaceMesh
-	>& field = const_cast
-	<
+    <
+        Type, fvsPatchField, surfaceMesh
+    >& field = const_cast
+    <
         GeometricField
-	<
-	    Type, fvsPatchField, surfaceMesh
-	>&
-	>(*fieldIter());
+    <
+        Type, fvsPatchField, surfaceMesh
+    >&
+    >(*fieldIter());
 
         /// Filter out field's name to not be advected
         /// Note: you can use Foam::reg(something) class as well
@@ -673,7 +637,7 @@ void Foam::meshDance::advects(bool writeAdvectedFields)
         {
             /// Create the copy of the field to be convected
 
-	    GeometricField<Type, fvsPatchField, surfaceMesh> tfield
+            GeometricField<Type, fvsPatchField, surfaceMesh> tfield
             (
                 IOobject
                 (
@@ -702,8 +666,8 @@ void Foam::meshDance::advects(bool writeAdvectedFields)
             GeometricField<Type, fvPatchField, volMesh> tvfield =
                 fvc::reconstruct(tfield);
 
-	    for (label iter=0; iter < maxIter_; iter++)
-	    {
+            for (label iter=0; iter < maxIter_; iter++)
+            {
                 fvMatrix<Type> fieldEq
                 (
                     fluxSign() * fvm::div(fluxSign() * mesh_.phi(), tvfield)
@@ -714,27 +678,27 @@ void Foam::meshDance::advects(bool writeAdvectedFields)
                 Info<<"    "
                     << fieldEq.solve()
                     << endl;
-	    }
+            }
 
-            Info<< "    " 
-                << "Field " 
-                << tfield.name()
-                //<< fieldPtr->name()
-                << " advected."
-                << endl;
+        Info<< "    "
+            << "Field "
+            << tfield.name()
+            //<< fieldPtr->name()
+            << " advected."
+            << endl;
 
-            /// Do not correct BC's for the temporary copy; it has
-            /// not-necessarily-correct zeroGradient on all boundaries
-            //tfield.correctBoundaryConditions();
+        /// Do not correct BC's for the temporary copy; it has
+        /// not-necessarily-correct zeroGradient on all boundaries
+        //tfield.correctBoundaryConditions();
 
-            //Info<< "    " 
-            //    << "Boundary condition of " 
-            //    << tfield.name()
-            //    //<< fieldPtr->name()
-            //    << " corrected."
-            //    << endl;
+        //Info<< "    " 
+        //    << "Boundary condition of " 
+        //    << tfield.name()
+        //    //<< fieldPtr->name()
+        //    << " corrected."
+        //    << endl;
 
-            //field.internalField() = tfield.internalField();
+        //field.internalField() = tfield.internalField();
             field.internalField() = fvc::interpolate(tvfield).internalField();
 
             Info<< "    "

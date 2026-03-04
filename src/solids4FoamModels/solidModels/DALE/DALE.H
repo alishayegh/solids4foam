@@ -19,18 +19,17 @@ Class
     DALE
 
 Description
-    Mathematical model for finite strains and rotations, where an updated
-    Lagrangian and incremental displacement approach is employed.
-
-    The stress is calculated by the run-time selectable mechanical law.
-
-    More details in:
-    P. Cardiff, Z. Tukovic, P. De Jaeger, M. Clancy and A. Ivankovic. A
-    Lagrangian cell-centred finite volume method for metal forming simulation,
-    doi=10.1002/nme.5345.
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
+    Maalik (Ali Shayegh, ali@tensorfields.com), TensorFields, UCD
+
+	- Lagrangian functionality is based on the UL model developed by
+	  Philip Cardiff.
+
+    Use the command below to see the author of (a) specific line(s):
+        git blame -L <start, end> <file>
+    e.g.,
+        git blame -L 100,100 form.C
 
 SourceFiles
     DALE.C
@@ -41,6 +40,8 @@ SourceFiles
 #define DALE_H
 
 #include "solidModel.H"
+#include "meshDance.H"
+//#include "dynamicFvMesh.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -93,6 +94,9 @@ class DALE
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+	    //- ALE-specifi members
+		label timeStepCounter_;
+
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
@@ -100,6 +104,12 @@ class DALE
 
         //- Disallow default bitwise assignment
         void operator=(const DALE&);
+
+		//- Update secondary fields in the iteration loop and after remap.
+        void updateSecondaryFields();
+
+		//- Rezone and remap
+        bool rezoneAndRemap();
 
 
 protected:
@@ -116,7 +126,7 @@ protected:
 public:
 
     //- Runtime type information
-    TypeName("nonLinearGeometryUpdatedLagrangian");
+    TypeName("DALE");
 
     // Constructors
 
@@ -173,6 +183,17 @@ public:
 
             //- Update total accumulated fields
             virtual void updateTotalFields();
+
+			//- Check if old fields are read from the disk; otherwise, re-set
+			//  them to the referenceField
+            //template<class T>
+            //GeometricField<T, fvPatchField, volMesh>& 
+            //DALE::readOld
+            //(
+            //    const word& newName,
+            //    const GeometricField<T, fvPatchField, volMesh>& referenceField,
+            //	const dimensionSet& dims
+            //);
 };
 
 

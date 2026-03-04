@@ -28,7 +28,12 @@ class meshDance//: public fvMesh
 
     ///*const*/ Time pseudoTime_;
 
-    autoPtr<dynamicFvMesh> dMeshPtr_;
+    /// When used in DALE solidModel, this gets lost (unallocated memory error)
+    //autoPtr<dynamicFvMesh> dMeshAPtr_;
+
+    //autoPtr<dynamicFvMesh>* dMeshAPtrPtr_;
+
+    dynamicFvMesh* dMeshPtr_;
 
     //fvMesh& mesh_;
 
@@ -64,8 +69,8 @@ class meshDance//: public fvMesh
 
     /*const*/ List<string> fixedPatches_;
 
-	/// To pass to remap()
-	/*const*/ bool ifForceWriteAtRemapTime_ = false;
+    /// To pass to remap()
+    /*const*/ bool ifForceWriteAtRemapTime_ = false;
 
     /// Run-time selected field names to not be advected
     List<string> illegalToAdvect_;
@@ -80,7 +85,7 @@ class meshDance//: public fvMesh
     /// Read remap settings
     label nRemapSteps_;
 
-	/// Must be initialized as used by advect()
+    /// Must be initialized as used by advect()
     bool writeRemappedSteps_ = false;
 
     label remapWriteFreq_;
@@ -88,8 +93,8 @@ class meshDance//: public fvMesh
     /// Laplacian smoother settings
     bool laplacianMeshSmoother_;
 
-	/// Now
-	word nowName_ = "";
+    /// Now
+    word nowName_ = "";
 
     //bool smoothPatches_;
     word patchWithSlidingPoints_;
@@ -200,9 +205,29 @@ class meshDance//: public fvMesh
         /// bekaert solver.
         dynamicFvMesh& dMesh()
         {
-            dynamicFvMesh& meshR = dMeshPtr_();
+            //dynamicFvMesh& meshR = dMeshPtr_();
+            //dynamicFvMesh& meshR = *dMeshPtr_;
 
-            return meshR;
+            //return meshR;
+            //return (*dMeshPtr_)();
+            //return dMeshAPtr_();
+            return *dMeshPtr_;
+        }
+
+        /// Return pointer to mesh
+        inline dynamicFvMesh* dMeshPtr()
+        //inline autoPtr<dynamicFvMesh>& dMeshPtr()
+        {
+		//	/// Error
+        //    //autoPtr<dynamicFvMesh> apdfvm(dMeshPtr_);
+
+        //    //autoPtr<dynamicFvMesh> apdfvm(dMeshPtr_);
+        //    //tmp<autoPtr<dynamicFvMesh> > tapdfvm(apdfvm);
+
+        //    // If returning non-tmp, you return reference to local variable
+        //    //return tapdfvm();
+        //    return *dMeshAPtrPtr_;
+            return dMeshPtr_;
         }
 
         /// Advect fields, driven by the most recent mesh motion

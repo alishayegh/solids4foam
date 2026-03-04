@@ -112,5 +112,5 @@ LIB_LIBS = \
     -ldynamicMesh \
     -lmeshTools \
     -ltopoChangerFvMesh \
-    -L$(FOAM_MODULE_LIBBIN) \
+    -L$(FOAM_USER_LIBBIN) \
     -lblockCoupledSolids4FoamTools -lRBFMeshMotionSolver

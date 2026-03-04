@@ -51,7 +51,33 @@ DALE::DALE
     const word& region
 )
 :
-    solidModel(typeName, runTime, region),
+    solidModel
+	(
+	    typeName, 
+		runTime,
+		region,
+		true // ALE mesh
+    ),
+    //ALEDict_
+    //(
+    //    IOobject
+    //    (
+    //        "ALEDict",
+    //        runTime.constant(),
+    //        runTime,
+    //        IOobject::MUST_READ
+    //    )
+    //),
+
+    /// Set up the morphing mesh
+    //deformingMesh_
+    //(
+    //    runTime,
+    //    false // Do not register fields
+    //),
+
+    //dMesh_(deformingMesh_.dMesh()),
+
     F_
     (
         IOobject
@@ -127,7 +153,8 @@ DALE::DALE
     ),
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
-    rImpK_(1.0/impK_)
+    rImpK_(1.0/impK_),
+	timeStepCounter_(0)
 {
     DDisRequired();
 
@@ -150,10 +177,106 @@ DALE::DALE
         // Let the mechanical law know
         mechanical().setRestart();
     }
+
+    // DALE requirements
+
+    // Allocate V0
+    mesh().setV0();
+
+    //if (restart())
+    //{
+		// /// Easy access to old fields through aliases
+		// /// "o" for old
+		// /// "r" for reference
+		// volVectorField& DDr = DD();
+		// volVectorField& DDor = DDr.oldTime();
+		// volVectorField& DDoor = DDor.oldTime();
+		// volVectorField& DDooor = DDoor.oldTime();
+
+		// volVectorField& Dr = D();
+		// volVectorField& Dor = Dr.oldTime();
+		// volVectorField& Door = Dor.oldTime();
+		// volVectorField& Dooor = Door.oldTime();
+
+		// volScalarField& rhor = rho();
+		// volScalarField& rhoor = rhor.oldTime();
+		// volScalarField& rhooor = rhoor.oldTime();
+		// volScalarField& rhoooor = rhooor.oldTime();
+
+		// /// Re-set old fields, if they did not exist on the disk
+		// /// Re-fill old field pointers
+
+        // DDor = this->readOld<vector>(DDo.name(), DD, dimLength);
+        // DDoor = this->readOld<vector>(DDoo.name(), DD, dimLength);
+        // DDooor = this->readOld<vector>(DDooo.name(), DD, dimLength);
+        // //Doooo = this->readOld<vector>(DD0000, "DD_0_0_0_0", DD);
+
+        // Dor = this->readOld<vector>(Do.name(), D, dimLength);
+        // Door = this->readOld<vector>(Doo.name(), D, dimLength);
+        // Dooor = this->readOld<vector>(Dooo.name(), D, dimLength);
+        // //this->readOld<vector>(D0000, "D_0_0_0_0", D);
+
+        // rhoor = this->readOld<scalar>(rhoo.name(), rho, dimDensity);
+        // rhooor = this->readOld<scalar>(rhooo.name(), rho, dimDensity);
+        // rhoooor = this->readOld<scalar>(rhoooo.name(), rho, dimDensity);
+        // //rho = this->readOld<scalar>(rho0000, "rho_0_0_0_0", rho);
+    //}
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+//template<class T>
+//GeometricField<T, fvPatchField, volMesh>& 
+//DALE::readOld
+//(
+//    const word& newName,
+//    const GeometricField<T, fvPatchField, volMesh>& referenceField,
+//	const dimensionSet& dims
+//)
+//{
+//    /// Try to read from the disk
+//    GeometricField<T, fvPatchField<T>, volMesh>* vfPtr = new
+//	    GeometricField<T, fvPatchField<T>, volMesh>
+//        (
+//            IOobject
+//            (
+//                newName,
+//                runTime.timeName(),
+//                mesh,
+//                IOobject::READ_IF_PRESENT,
+//                IOobject::AUTO_WRITE
+//            ),
+//            mesh,
+//            dimensioned<T>("zero", dims, pTraits<T>::zero)
+//        );
+//
+//    GeometricField<T, fvPatchField<T>, volMesh>& vf = *vfPtr;
+//
+//    /// Did you read it from the disk?
+//    if (vf.headerOk())
+//    {
+//	    return vf;
+//    }
+//    else
+//    {
+//        if (referenceField.headerOk())
+//        {
+//            vf = referenceField;
+//            vf.rename(newName);
+//	        return vf;
+//        }
+//        else
+//        {
+//            FatalErrorIn("Constructor")
+//                << "Could not find "
+//				<< referenceField.name()
+//				<< " at "
+//                << runTime.timeName()
+//                << abort(FatalError);
+//        }
+//    }
+//}
 
 
 bool DALE::evolve()
@@ -202,26 +325,29 @@ bool DALE::evolve()
         // Under-relax the DD field using fixed or adaptive under-relaxation
         relaxField(DD(), iCorr);
 
-        // Update the total displacement
-        D() = D().oldTime() + DD();
+		// Update secondary fields
+        this->updateSecondaryFields();
 
-        // Update gradient of displacement increment
-        mechanical().grad(DD(), gradDD());
+        // // Update the total displacement
+        // D() = D().oldTime() + DD();
 
-        // Relative deformation gradient
-        relF_ = I + gradDD().T();
+        // // Update gradient of displacement increment
+        // mechanical().grad(DD(), gradDD());
 
-        // Inverse relative deformation gradient
-        relFinv_ = inv(relF_);
+        // // Relative deformation gradient
+        // relF_ = I + gradDD().T();
 
-        // Total deformation gradient
-        F_ = relF_ & F_.oldTime();
+        // // Inverse relative deformation gradient
+        // relFinv_ = inv(relF_);
 
-        // Relative Jacobian (Jacobian of relative deformation gradient)
-        relJ_ = det(relF_);
+        // // Total deformation gradient
+        // F_ = relF_ & F_.oldTime();
 
-        // Jacobian of deformation gradient
-        J_ = relJ_*J_.oldTime();
+        // // Relative Jacobian (Jacobian of relative deformation gradient)
+        // relJ_ = det(relF_);
+
+        // // Jacobian of deformation gradient
+        // J_ = relJ_*J_.oldTime();
 
         // Update the momentum equation inverse diagonal field
         // This may be used by the mechanical law when calculating the
@@ -248,11 +374,19 @@ bool DALE::evolve()
      && ++iCorr < nCorr()
     );
 
+	// Rezone and remap
+	this->rezoneAndRemap();
+    this->updateSecondaryFields();
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
+
     // Update gradient of total displacement
     gradD() = fvc::grad(D().oldTime() + DD());
 
     // Total displacement
-    D() = D().oldTime() + DD();
+	/// Already updated by updateSecondaryFields()
+    //D() = D().oldTime() + DD();
 
     // Update pointDD as it used by FSI procedure
     mechanical().interpolate(DD(), gradDD(), pointDD());
@@ -270,6 +404,65 @@ bool DALE::evolve()
 #endif
 
     return true;
+}
+
+
+bool DALE::rezoneAndRemap()
+{
+    ++timeStepCounter_;
+
+    if
+    (
+        this->deformingMesh().badMesh()
+        /// Checks if timeStepCounter % rezoneFreq == 0
+     || this->deformingMesh().rezoneNow(timeStepCounter_)
+    )
+    {
+        Info<<"\n    Rezone + Remap ... \n";
+
+        /// Obtain rezoned mesh
+        this->deformingMesh().rezone(this->deformingMesh().smooth());
+
+        /// Remap
+        this->deformingMesh().remap();
+
+        /// Momentum corrector should be solved to a tight tolerance after
+        /// remap
+        //const_cast<label&>(nCorr) = maxMomentumIterAfterRemap;
+
+        Info<< "Finished rezone and remap\n";
+
+	    return true;
+    }
+	else return false;
+}
+
+
+void DALE::updateSecondaryFields()
+{
+    // Update the total displacement
+    D() = D().oldTime() + DD();
+
+    // Update gradient of displacement increment
+    mechanical().grad(DD(), gradDD());
+
+    // Relative deformation gradient
+    relF_ = I + gradDD().T();
+
+    // Inverse relative deformation gradient
+    relFinv_ = inv(relF_);
+
+    // Total deformation gradient
+    F_ = relF_ & F_.oldTime();
+
+    // Relative Jacobian (Jacobian of relative deformation gradient)
+    relJ_ = det(relF_);
+
+    // Jacobian of deformation gradient
+    J_ = relJ_*J_.oldTime();
+
+    // Calculate the stress using run-time selectable mechanical law
+    //mechanical().correct(sigma());
 }
 
 
