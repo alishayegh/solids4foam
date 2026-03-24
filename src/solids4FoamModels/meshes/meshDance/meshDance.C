@@ -275,7 +275,8 @@ bool Foam::meshDance::stepTowards()
             << "Mesh moves to the final points, ignoring the overshoot.\n"
             << /*abort(FatalError)*/endl;
 
-            hitFinalMesh();
+        hitFinalMesh();
+
         return true;
     }
     else
@@ -293,7 +294,8 @@ bool Foam::meshDance::stepTowards()
                 << endl;
 
             hitFinalMesh();
-        return true;
+
+            return true;
         }
         else
         {
@@ -309,7 +311,7 @@ bool Foam::meshDance::stepTowards()
             );
         }
 
-    return false;
+        return false;
     }
 }
 
@@ -886,14 +888,35 @@ void Foam::meshDance::remap(const bool write)
     /// To be accessed inside advect()
     nowName_ = runTime_.timeName();
 
+    /// Needed for time control headers
+
+    /// const_cast time for possible deltaT adjustment based on Co. No.
+    /*const*/ Time& runTime = const_cast<Time&>(runTime_);
+    const fvMesh& mesh = mesh_;
+    #include "createTimeControls.H"
+
     for (label iter = 0; iter < nRemapSteps_; ++iter)
     {
         Info<< "Remap step = "
             <<iter<<"\n";
 
+        #include "readTimeControls.H"
+
+        /// Set time step
+        /// Uses delta, not cell edges, to calculate meshCo.
+        #include "meshCourantNo.H"
+
+        /// setDeltaT.H needs CoNum
+        scalar& CoNum = meshCoNum;
+
+        /// Re-set time step, if requested
+        /// Place it inside time loop for online interaction with Co settings
+        #include "setDeltaT.H"
+
+
         /// Rezone overshoot-proof
         /// Read fields from the database and advect
-        if(this -> stepTowards())
+        if (this -> stepTowards())
         {
             Info<< "\n    Final mesh in this cycle is hit; ignore next"
                 << "\n    time steps, advect fields and move to the" 
@@ -918,7 +941,8 @@ void Foam::meshDance::remap(const bool write)
         //this -> advect<sphericalTensor>(write);
 
         /// Move ahead; needs to be after advect()
-        const_cast<Time&>(/*pseudo*/runTime_)++;
+        /// This only affects writeTime directories
+        //const_cast<Time&>(/*pseudo*/runTime_)++;
 
         /// Write -- for debugging
 
@@ -942,13 +966,13 @@ void Foam::meshDance::remap(const bool write)
     //        now
     //    );
 
-    const_cast<Time&>(runTime_).setTime
-    (
-        now,
-        nowIndex
-        //0
-        //1
-    );
+    //const_cast<Time&>(runTime_).setTime
+    //(
+    //    now,
+    //    nowIndex
+    //    //0
+    //    //1
+    //);
 
     /// write parameter is responsible for forcing mesh and fields being
     /// written, ignoring the controlDict write controls

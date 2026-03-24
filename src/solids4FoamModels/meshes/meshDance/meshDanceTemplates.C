@@ -397,15 +397,15 @@ void Foam::meshDance::advect(bool writeAdvectedFields)
     )
     {
         GeometricField
-    <
-        Type, fvPatchField, volMesh
-    >& field = const_cast
-    <
-        GeometricField
-    <
-        Type, fvPatchField, volMesh
-    >&
-    >(*fieldIter());
+        <
+            Type, fvPatchField, volMesh
+        >& field = const_cast
+        <
+            GeometricField
+            <
+                Type, fvPatchField, volMesh
+            >&
+        >(*fieldIter());
 
         if 
         (
@@ -414,7 +414,7 @@ void Foam::meshDance::advect(bool writeAdvectedFields)
         {
             /// Create the copy of the field to be convected
 
-        GeometricField<Type, fvPatchField, volMesh> tfield
+            GeometricField<Type, fvPatchField, volMesh> tfield
             (
                 IOobject
                 (
@@ -437,19 +437,19 @@ void Foam::meshDance::advect(bool writeAdvectedFields)
                 << " created"
                 << endl;
 
-        for (label iter=0; iter < maxIter_; iter++)
-        {
-                fvMatrix<Type> fieldEq
-                (
-                    fluxSign() * fvm::div(fluxSign() * mesh_.phi(), tfield)
-                 == fvm::ddt(tfield)
-                );
+            for (label iter=0; iter < maxIter_; iter++)
+            {
+                    fvMatrix<Type> fieldEq
+                    (
+                        fluxSign() * fvm::div(fluxSign() * mesh_.phi(), tfield)
+                     == fvm::ddt(tfield)
+                    );
 
-                //TEq.solve();
-                Info<<"    "
-                    << fieldEq.solve()
-                    << endl;
-        }
+                    //TEq.solve();
+                    Info<<"    "
+                        << fieldEq.solve()
+                        << endl;
+            }
 
             Info<< "    " 
                 << "Field " 
