@@ -23,4 +23,5 @@ EXE_INC = \
 
 EXE_LIBS = \
     -L$(FOAM_MODULE_LIBBIN) -lsolids4FoamModels \
-    $(GFORTRAN_LIBS)
+    $(GFORTRAN_LIBS) \
+    -lcfMesh

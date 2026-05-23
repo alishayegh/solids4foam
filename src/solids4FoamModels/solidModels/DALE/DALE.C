@@ -375,11 +375,13 @@ bool DALE::evolve()
     );
 
 	// Rezone and remap
-	this->rezoneAndRemap();
-    this->updateSecondaryFields();
+	if (this->rezoneAndRemap())
+    {
+        this->updateSecondaryFields();
 
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigma());
+    }
 
     // Update gradient of total displacement
     gradD() = fvc::grad(D().oldTime() + DD());
