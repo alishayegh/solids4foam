@@ -436,7 +436,8 @@ bool DALE::rezoneAndRemap()
 
 	    return true;
     }
-	else return false;
+
+	return false;
 }
 
 
