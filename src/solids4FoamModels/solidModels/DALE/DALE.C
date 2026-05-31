@@ -295,9 +295,15 @@ bool DALE::evolve()
     Info<< "Solving the updated Lagrangian form of the momentum equation for DD"
         << endl;
 
+    volScalarField* DEqnAPtr = NULL;
+
     // Momentum equation loop
     do
     {
+        // Free the heap
+        delete DEqnAPtr;
+        DEqnAPtr = NULL;
+
         // Store fields for under-relaxation and residual calculation
         DD().storePrevIter();
 
@@ -352,7 +358,8 @@ bool DALE::evolve()
         // Update the momentum equation inverse diagonal field
         // This may be used by the mechanical law when calculating the
         // hydrostatic pressure
-        const volScalarField DEqnA("DEqnA", DDEqn.A());
+        //const volScalarField DEqnA("DEqnA", DDEqn.A());
+        DEqnAPtr = new volScalarField("DEqnA", DDEqn.A());
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma());
@@ -379,6 +386,8 @@ bool DALE::evolve()
     {
         this->updateSecondaryFields();
 
+        //const volScalarField DEqnA = *DEqnAPtr;
+
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma());
     }
@@ -404,6 +413,10 @@ bool DALE::evolve()
 #else
     blockLduMatrix::debug = 1;
 #endif
+
+    // Free the heap
+    delete DEqnAPtr;
+    DEqnAPtr = NULL;
 
     return true;
 }

@@ -1167,7 +1167,8 @@ Foam::pointField Foam::meshDance::smooth/*cfMeshSmooth*/
             {
                 lockedPatches.setSize(++lpc);
 
-                lockedPatches[patchI] = bm.findPatchID(lockedPatchNames[patchI]);
+                /// Note: Subscript falls behind patchI in general
+                lockedPatches[/*patchI*/lpc - 1] = bm.findPatchID(lockedPatchNames[patchI]);
             }
 
             //if (lockedPatches[patchI] == -1)
