@@ -376,7 +376,7 @@ void Foam::meshDance::setOverallPointMotion
 }
 
 /// Time-step adaptive point increment
-/// Returns true if points moved
+/// Returns true if the final mesh is hit
 bool Foam::meshDance::stepTowards()
 {
     /// Incremental motion, dx = (dt / Time) * totalMove
@@ -463,9 +463,11 @@ bool Foam::meshDance::stepTowards()
             );
 
             /// Points moved.
-            return true;
+            //return false;
         }
     }
+
+    return false;
 }
 
 bool Foam::meshDance::hitFinalMesh()
@@ -497,12 +499,14 @@ void Foam::meshDance::updateMotionFraction()
               - startTime_.value()
             );
 
-        sumMotionFraction_ += motionFraction_; 
+        //sumMotionFraction_ += motionFraction_; 
     }
     else
     {
         motionFraction_ = 1 / ( SMALL + rMotionFraction_);
     }
+
+    sumMotionFraction_ += motionFraction_; 
 }
 
 /// Access motion fraction
@@ -623,6 +627,8 @@ void Foam::meshDance::resetStartingPoints(const pointField& pf)
 /// - sumMotionFraction
 /// \note: It is the driver's responsibility to use it when needed.
 /// This class is not aware of when the cycle finishes as of now.
+
+/// Update: It is now aware!
 void Foam::meshDance::resetMotion()
 {
     const Time& runTime = mesh_.time();
@@ -1886,122 +1892,63 @@ void Foam::meshDance::remap(const bool write)
 
     /// To be accessed inside advect()
     nowName_ = runTime_.timeName();
-    const_cast<Time&>(runTime_).setDeltaT(1);
 
-    /// Save old- and oldOld-physical-time fields
-    //saveOldTimes<scalar>();
-    //saveOldTimes<vector>();
-    //saveOldTimes<tensor>();
-    //saveOldTimes<symmTensor>();
+    /// If pseudo time is not real time
+    if (nRemapSteps_)
+    {
+        const_cast<Time&>(runTime_).setDeltaT(1);
+    }
 
-    //this->storeFieldCopies<scalar>();
-    //this->storeFieldCopies<vector>();
-    //this->storeFieldCopies<tensor>();
-    //this->storeFieldCopies<symmTensor>();
-
-    /// Advect nowTime fields
-    //if (meshFluxMeetsThreshold())
-    //{
-
-    //isSameAsOld<vector>(word("DU"), "Before remap loop:\n", word("Before_remap_loop"));
-
-        for (label iter = 0; iter < nRemapSteps_; ++iter)
-        {
-            Info<< "Remap step = "
-                <<iter<<"\n";
-
-            /// Rezone overshoot-proof
-            /// Read fields from the database and advect
-            if (this -> stepTowards())
-            {
-                Info<< "\n    Final mesh in this cycle is hit; ignore next"
-                    << "\n    time steps, advect fields and move to the" 
-                    << "\n    next cycle."
-                    << endl;
-
-                /// VolFields
-                this -> advect<scalar>    (writeRemappedSteps_);
-                this -> advect<vector>    (writeRemappedSteps_);
-                this -> advect<tensor>    (writeRemappedSteps_);
-                this -> advect<symmTensor>(writeRemappedSteps_);
-                //this -> advect<sphericalTensor>(write);
-
-                if (finalMeshIsHit_)
-                {
-                    finalMeshIsHit_ = false;
-                    break;
-                }
-            }
-
-            /// Volume fields
-            //this -> advect<scalar>    (writeRemappedSteps_);
-            //this -> advect<vector>    (writeRemappedSteps_);
-            //this -> advect<tensor>    (writeRemappedSteps_);
-            //this -> advect<symmTensor>(writeRemappedSteps_);
-            //this -> advect<sphericalTensor>(write);
-
-            //isSameAsOld<vector>(word("DU"), "In advect loop, before time++\n",
-            //word("In_advect_loop_before_timePP"));
-
-            /// Move ahead; needs to be after advect()
-            //const_cast<Time&>(/*pseudo*/runTime_)++;
-
-            /// Does it prevent the re-creation of old fields?
-            //resetFieldTimeIndex<scalar>    (runTime_.timeIndex());
-            //resetFieldTimeIndex<vector>    (runTime_.timeIndex());
-            //resetFieldTimeIndex<tensor>    (runTime_.timeIndex());
-            //resetFieldTimeIndex<symmTensor>(runTime_.timeIndex());
-
-            /// Store old fields
-            //storeOldFields();
-             
-            /// Previous design: Write remap steps in physical time dirs.
-            /// New design: Write remap steps "inside" the remap physical time
-
-            //isSameAsOld<vector>(word("DU"), "In advect loop, after time++\n",
-            //word("In_advect_loop_after_timePP"));
-        }
-
-        //isSameAsOld<vector>(word("DU"), "After advect loop",
-        //word("After_advect_loop"));
-
-        /// Correct physical time, and prevent fields from re-creating old
-        /// fields
-        this->resetTime(now, nowIndex, deltaT);
-
-        //isSameAsOld<vector>(word("DU"), "After reset time",
-        //word("After_reset_time"));
-
-        /// write parameter is responsible for forcing mesh and fields being
-        /// written, ignoring the controlDict write controls
-        //if (write)
-        if (ifForceWriteAtRemapTime_)
-        {
-            this->write();
-
-            Info<< "    Mesh and fields written to "
-                << runTime_.timeName()
-                << "\n";
-        }
-
-        //isSameAsOld<vector>(word("DU"), "In advect loop, after force write\n",
-        //word("DU_0"));
-
-        Info<<"    Remap done\n    Time reset to "
-            << runTime_.timeName()
+    for (label iter = 0; iter < nRemapSteps_; ++iter)
+    {
+        Info<< "Remap step = "
+            << iter + 1
             <<"\n";
-    //}
-    //else
-    //{
-    //    Info<<"    Rezone and Remap is skipped."
-    //        << endl;
-    //}
 
-    /// Advect oldTime fields
-    //AdvectOldFields();
+        /// Rezone overshoot-proof
+        /// Read fields from the database and advect
+        bool finalMeshIsHit = stepTowards();
 
-    /// Update field.oldTime() and field.oldTime().oldTime()
-    //UpdateOldFields();
+        /// VolFields
+        this -> advect<scalar>    (writeRemappedSteps_);
+        this -> advect<vector>    (writeRemappedSteps_);
+        this -> advect<tensor>    (writeRemappedSteps_);
+        this -> advect<symmTensor>(writeRemappedSteps_);
+        //this -> advect<sphericalTensor>(write);
+
+        if (finalMeshIsHit)
+        {
+            Info<< "\n    Final mesh in this time step is hit; ignore next"
+                << "\n    remap steps, advect fields and move on to the" 
+                << "\n    next time step."
+                << endl;
+
+            break;
+        }
+    }
+
+    /// Correct physical time, and prevent fields from re-creating old
+    /// fields
+    this->resetTime(now, nowIndex, deltaT);
+
+    /// Re-set step-wise mesh motion data
+    this->resetSumMotionFraction();
+
+    /// write parameter is responsible for forcing mesh and fields being
+    /// written, ignoring the controlDict write controls
+    //if (write)
+    if (ifForceWriteAtRemapTime_)
+    {
+        this->write();
+
+        Info<< "    Mesh and fields written to "
+            << runTime_.timeName()
+            << "\n";
+    }
+
+    Info<<"    Remap done\n    Time reset to "
+        << runTime_.timeName()
+        <<"\n";
 }
 
 
